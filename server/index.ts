@@ -59,17 +59,34 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  // Mặc định sử dụng IP 0.0.0.0 để ứng dụng có thể truy cập từ bên ngoài
-  // Khi chạy local, bạn có thể thay đổi thành 'localhost' hoặc '127.0.0.1' nếu gặp lỗi ENOTSUP
-  // Lưu ý: DÙNG BIẾN MÔI TRƯỜNG ĐỂ OVERRIDE HOST KHI CẦN
+  // Xác định host dựa trên hệ điều hành
+  // Windows thường không hỗ trợ 0.0.0.0 (gây lỗi ENOTSUP) nên dùng 127.0.0.1
+  // Các hệ điều hành khác dùng 0.0.0.0 để ứng dụng có thể truy cập từ bên ngoài
   const port = process.env.PORT || 5000;
-  const host = process.env.HOST || "0.0.0.0";
+  const defaultHost = process.platform === 'win32' ? '127.0.0.1' : '0.0.0.0';
+  const host = process.env.HOST || defaultHost;
   
-  server.listen({
-    port: Number(port),
-    host: host,
-    reusePort: true,
-  }, () => {
-    log(`serving on ${host}:${port}`);
-  });
+  try {
+    server.listen({
+      port: Number(port),
+      host: host,
+      reusePort: true,
+    }, () => {
+      log(`serving on ${host}:${port}`);
+    });
+  } catch (error) {
+    // Nếu gặp lỗi với 0.0.0.0, thử lại với 127.0.0.1
+    if (host === '0.0.0.0') {
+      log(`Failed to bind to ${host}:${port}, trying 127.0.0.1:${port}`);
+      server.listen({
+        port: Number(port),
+        host: '127.0.0.1',
+        reusePort: true,
+      }, () => {
+        log(`serving on 127.0.0.1:${port}`);
+      });
+    } else {
+      throw error;
+    }
+  }
 })();
