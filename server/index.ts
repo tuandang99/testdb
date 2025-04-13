@@ -59,12 +59,17 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  // Mặc định sử dụng IP 0.0.0.0 để ứng dụng có thể truy cập từ bên ngoài
+  // Khi chạy local, bạn có thể thay đổi thành 'localhost' hoặc '127.0.0.1' nếu gặp lỗi ENOTSUP
+  // Lưu ý: DÙNG BIẾN MÔI TRƯỜNG ĐỂ OVERRIDE HOST KHI CẦN
+  const port = process.env.PORT || 5000;
+  const host = process.env.HOST || "0.0.0.0";
+  
   server.listen({
-    port,
-    host: "0.0.0.0",
+    port: Number(port),
+    host: host,
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on ${host}:${port}`);
   });
 })();

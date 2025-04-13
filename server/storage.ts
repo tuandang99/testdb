@@ -30,9 +30,9 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private connectionPools: Map<number, Pool> = new Map();
+  private connectionPools: Map<number, typeof Pool.prototype> = new Map();
   
-  private async getConnectionPool(connectionId: number): Promise<Pool> {
+  private async getConnectionPool(connectionId: number): Promise<typeof Pool.prototype> {
     // Check if we already have a pool for this connection
     if (this.connectionPools.has(connectionId)) {
       return this.connectionPools.get(connectionId)!;
