@@ -120,14 +120,22 @@ export class DatabaseStorage implements IStorage {
       client.release();
       await testPool.end();
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Connection test failed:", error);
+      
+      // Đóng pool kết nối
       try {
         await testPool.end();
       } catch (endError) {
         console.error("Error ending test pool:", endError);
       }
-      return false;
+      
+      // Ném lỗi với thông báo cụ thể thay vì trả về false
+      const errorMessage = error.message || 'Unknown database connection error';
+      const customError: any = new Error(`Database connection failed: ${errorMessage}`);
+      customError.status = 400;
+      customError.originalError = error;
+      throw customError;
     }
   }
 

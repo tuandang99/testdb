@@ -61,19 +61,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const connection = insertDbConnectionSchema.parse(req.body);
       
-      // Test the connection before saving
-      const connectionValid = await storage.testConnection(connection);
-      
-      if (!connectionValid) {
-        return res.status(400).json({ message: "Failed to connect to database with the provided credentials" });
+      try {
+        // Test the connection before saving
+        await storage.testConnection(connection);
+        
+        // If successful, create the connection
+        const newConnection = await storage.createConnection(connection);
+        
+        // Don't return password
+        const { password, ...safeConnection } = newConnection;
+        res.status(201).json(safeConnection);
+      } catch (connectionErr: any) {
+        // Trả về lỗi kết nối cụ thể với status 400
+        console.error("Connection creation error:", connectionErr);
+        res.status(400).json({ 
+          message: connectionErr.message || "Failed to connect to database",
+          error: connectionErr.originalError?.message
+        });
       }
-      
-      const newConnection = await storage.createConnection(connection);
-      
-      // Don't return password
-      const { password, ...safeConnection } = newConnection;
-      res.status(201).json(safeConnection);
     } catch (err) {
+      // Lỗi xác thực dữ liệu đầu vào
       handleError(err, res);
     }
   });
@@ -87,7 +94,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If connection details are changing, test the connection
       if (updateData.host || updateData.port || updateData.database || 
-          updateData.username || updateData.password) {
+          updateData.username || updateData.password || updateData.ssl !== undefined) {
         
         // Get current connection data
         const currentConnection = await storage.getConnection(id);
@@ -106,13 +113,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ssl: updateData.ssl !== undefined ? updateData.ssl : currentConnection.ssl
         };
         
-        const connectionValid = await storage.testConnection(testConnection);
-        
-        if (!connectionValid) {
-          return res.status(400).json({ message: "Failed to connect to database with the provided credentials" });
+        try {
+          // Test the connection with updated details
+          await storage.testConnection(testConnection);
+        } catch (connectionErr: any) {
+          // Trả về lỗi kết nối cụ thể với status 400
+          console.error("Connection update error:", connectionErr);
+          return res.status(400).json({ 
+            message: connectionErr.message || "Failed to connect to database with the updated credentials",
+            error: connectionErr.originalError?.message
+          });
         }
       }
       
+      // Cập nhật kết nối trong database
       const updatedConnection = await storage.updateConnection(id, updateData);
       
       if (!updatedConnection) {
@@ -145,10 +159,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   router.post("/connections/test", async (req: Request, res: Response) => {
     try {
       const connection = insertDbConnectionSchema.parse(req.body);
-      const success = await storage.testConnection(connection);
       
-      res.json({ success });
+      try {
+        await storage.testConnection(connection);
+        res.json({ success: true });
+      } catch (connectionErr: any) {
+        // Trả về lỗi kết nối cụ thể với status 400
+        console.error("Connection test error:", connectionErr);
+        res.status(400).json({ 
+          success: false, 
+          message: connectionErr.message || "Failed to connect to database",
+          error: connectionErr.originalError?.message
+        });
+      }
     } catch (err) {
+      // Lỗi xác thực dữ liệu đầu vào
       handleError(err, res);
     }
   });
