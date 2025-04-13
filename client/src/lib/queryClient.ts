@@ -2,8 +2,32 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let errorMessage = '';
+    
+    try {
+      // Thử đọc dưới dạng JSON trước
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        // Phản hồi là JSON
+        const errorData = await res.clone().json();
+        errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
+      } else {
+        // Phản hồi không phải JSON, đọc dưới dạng text
+        const text = await res.clone().text();
+        
+        // Nếu văn bản có dạng HTML, rút gọn nó
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+          errorMessage = `Server returned HTML error page (${res.status}: ${res.statusText})`;
+        } else {
+          errorMessage = text;
+        }
+      }
+    } catch (err) {
+      // Không thể đọc phản hồi
+      errorMessage = res.statusText || `Error ${res.status}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 

@@ -51,8 +51,14 @@ export function ConnectionForm({ onSuccess }: ConnectionFormProps) {
   const createConnection = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
       const { savePassword, ...connectionData } = data;
-      const res = await apiRequest("POST", "/api/connections", connectionData);
-      return await res.json();
+      try {
+        const res = await apiRequest("POST", "/api/connections", connectionData);
+        return await res.json();
+      } catch (error: any) {
+        // Ghi log lỗi để debug
+        console.error('Connection creation error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       toast({
@@ -64,9 +70,10 @@ export function ConnectionForm({ onSuccess }: ConnectionFormProps) {
       }
     },
     onError: (error: Error) => {
+      // Hiển thị thông báo lỗi chi tiết hơn
       toast({
         title: "Connection failed",
-        description: error.message,
+        description: error.message || "Failed to create database connection",
         variant: "destructive",
       });
     },
@@ -87,16 +94,19 @@ export function ConnectionForm({ onSuccess }: ConnectionFormProps) {
           description: "Successfully connected to the database",
         });
       } else {
+        // Hiển thị thông báo lỗi chi tiết từ server
         toast({
           title: "Connection failed",
-          description: "Failed to connect to the database with the provided credentials",
+          description: data.message || data.error || "Failed to connect to the database with the provided credentials",
           variant: "destructive",
         });
       }
     } catch (error: any) {
+      // Error đã được xử lý trong queryClient.ts
+      console.error('Connection test error:', error);
       toast({
         title: "Connection failed",
-        description: error.message,
+        description: error.message || "An unexpected error occurred during the connection test",
         variant: "destructive",
       });
     } finally {
