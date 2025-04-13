@@ -1,7 +1,9 @@
 import { dbConnections, type DbConnection, type InsertDbConnection, savedQueries, type SavedQuery, type InsertSavedQuery } from "@shared/schema";
 import { db, pool as appPool } from "./db";
 import { eq } from "drizzle-orm";
-import { Pool } from "@neondatabase/serverless";
+import pg from "pg";
+
+const { Pool } = pg;
 
 export interface IStorage {
   // Database connection management
