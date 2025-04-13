@@ -62,31 +62,62 @@ app.use((req, res, next) => {
   // Xác định host dựa trên hệ điều hành
   // Windows thường không hỗ trợ 0.0.0.0 (gây lỗi ENOTSUP) nên dùng 127.0.0.1
   // Các hệ điều hành khác dùng 0.0.0.0 để ứng dụng có thể truy cập từ bên ngoài
-  const port = process.env.PORT || 5000;
+  const startPort = process.env.PORT ? Number(process.env.PORT) : 5000;
   const defaultHost = process.platform === 'win32' ? '127.0.0.1' : '0.0.0.0';
   const host = process.env.HOST || defaultHost;
   
-  try {
-    server.listen({
-      port: Number(port),
-      host: host,
-      reusePort: true,
-    }, () => {
-      log(`serving on ${host}:${port}`);
-    });
-  } catch (error) {
-    // Nếu gặp lỗi với 0.0.0.0, thử lại với 127.0.0.1
-    if (host === '0.0.0.0') {
-      log(`Failed to bind to ${host}:${port}, trying 127.0.0.1:${port}`);
-      server.listen({
-        port: Number(port),
-        host: '127.0.0.1',
-        reusePort: true,
-      }, () => {
-        log(`serving on 127.0.0.1:${port}`);
+  // Hàm thử lắng nghe trên một port cụ thể
+  function tryListenOnPort(portToTry: number, maxAttempts: number = 5) {
+    let currentAttempt = 0;
+    
+    function startListening(port: number, useHost: string) {
+      // Loại bỏ các event listeners trước đó để tránh memory leak
+      server.removeAllListeners('error');
+      server.removeAllListeners('listening');
+      
+      // Xử lý lỗi khi không thể bind vào port
+      server.once('error', (error: any) => {
+        if (error.code === 'EADDRINUSE') {
+          // Port đang bị sử dụng, thử port khác
+          if (currentAttempt < maxAttempts) {
+            currentAttempt++;
+            const nextPort = port + 1;
+            log(`Port ${port} in use, trying port ${nextPort}`);
+            startListening(nextPort, useHost);
+          } else {
+            log(`Failed to find available port after ${maxAttempts} attempts. Last tried: ${port}`);
+            throw error;
+          }
+        } else if (error.code === 'ENOTSUP' && useHost === '0.0.0.0') {
+          // 0.0.0.0 không được hỗ trợ (thường trên Windows), thử dùng 127.0.0.1
+          log(`Failed to bind to ${useHost}:${port}, trying 127.0.0.1:${port}`);
+          startListening(port, '127.0.0.1');
+        } else {
+          // Lỗi khác, hiển thị và throw
+          log(`Error starting server: ${error.code} - ${error.message}`);
+          throw error;
+        }
       });
-    } else {
-      throw error;
+      
+      // Khi server đã lắng nghe thành công
+      server.once('listening', () => {
+        const address = server.address();
+        const listeningHost = typeof address === 'string' ? address : `${address?.address}:${address?.port}`;
+        log(`Server is serving on ${listeningHost}`);
+      });
+      
+      // Bắt đầu lắng nghe
+      server.listen({
+        port: port,
+        host: useHost,
+        reusePort: true
+      });
     }
+    
+    // Bắt đầu quá trình
+    startListening(portToTry, host);
   }
+  
+  // Bắt đầu lắng nghe từ port được chỉ định
+  tryListenOnPort(startPort);
 })();
