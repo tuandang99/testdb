@@ -1,0 +1,268 @@
+# 🛒 Full Database Schema Documentation
+
+Welcome! This document outlines the full PostgreSQL database schema designed for a product and content management system. It supports essential features such as product listing, image galleries, blogging, customer testimonials, contact forms, and basic order handling.
+
+---
+
+## 📚 Overview of Tables
+
+| Table Name       | Description                                      |
+|------------------|--------------------------------------------------|
+| `categories`     | Stores product categories                        |
+| `products`       | Main product information                         |
+| `product_images` | Stores multiple images per product               |
+| `blog_posts`     | Blog posts and content articles                  |
+| `testimonials`   | Customer reviews and ratings                     |
+| `orders`         | Order and checkout information                   |
+| `contacts`       | Contact form messages                            |
+| `admin_keys`     | Admin API keys for backend authentication        |
+
+---
+
+## 📁 1. Categories
+
+```sql
+CREATE TABLE categories (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  image TEXT NOT NULL
+);
+```
+
+**Purpose:** Organize products into groups or themes.
+
+- `slug`: Used for SEO and URL routing.
+- `image`: Icon/banner representing the category.
+
+---
+
+## 📦 2. Products
+
+```sql
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  price DOUBLE PRECISION NOT NULL,
+  old_price DOUBLE PRECISION,
+  image TEXT NOT NULL,
+  category_id INTEGER NOT NULL REFERENCES categories(id),
+  rating DOUBLE PRECISION DEFAULT 5,
+  is_new BOOLEAN DEFAULT false,
+  is_organic BOOLEAN DEFAULT true,
+  is_bestseller BOOLEAN DEFAULT false,
+  details JSONB DEFAULT '[]'::jsonb,
+  discount INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Purpose:** Core table to manage product data.
+
+- Supports labels: `is_new`, `is_organic`, `is_bestseller`.
+- JSONB field `details` can store specifications, nutrition, usage, etc.
+- `category_id` links to the `categories` table.
+
+---
+
+## 🖼️ 3. Product Images
+
+```sql
+CREATE TABLE product_images (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  image_path TEXT NOT NULL,
+  is_main BOOLEAN DEFAULT false,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Purpose:** Enable a product to have multiple images.
+
+- `is_main`: Marks the primary display image.
+- `display_order`: Defines the visual sequence of images.
+
+---
+
+## ✍️ 4. Blog Posts
+
+```sql
+CREATE TABLE blog_posts (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  content TEXT NOT NULL,
+  excerpt TEXT NOT NULL,
+  image TEXT NOT NULL,
+  category VARCHAR(255) NOT NULL,
+  tags TEXT,
+  author VARCHAR(255),
+  meta_title VARCHAR(255),
+  meta_description TEXT,
+  featured BOOLEAN DEFAULT false,
+  status VARCHAR(20) DEFAULT 'published',
+  date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Purpose:** Publish articles, product guides, SEO content, and updates.
+
+- SEO fields: `slug`, `meta_title`, `meta_description`, `tags`.
+- `status`: Supports states like `published`, `draft`.
+
+---
+
+## 💬 5. Testimonials
+
+```sql
+CREATE TABLE testimonials (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  avatar TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  comment TEXT NOT NULL
+);
+```
+
+**Purpose:** Display user feedback or reviews on frontend.
+
+- `rating`: Integer (typically 1–5).
+- `avatar`: Image path or URL.
+
+---
+
+## 🧾 6. Orders
+
+```sql
+CREATE TABLE orders (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  phone VARCHAR(50) NOT NULL,
+  address TEXT NOT NULL,
+  items TEXT NOT NULL,
+  total DOUBLE PRECISION NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Purpose:** Handle order submissions and customer checkout info.
+
+- `items`: Can be JSON-encoded array or string summary.
+- `status`: Tracks order progression (`pending`, `confirmed`, `shipped`, etc.)
+
+---
+
+## 📬 7. Contacts
+
+```sql
+CREATE TABLE contacts (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Purpose:** Receive contact form submissions (e.g., inquiries, feedback).
+
+---
+
+## 🔐 8. Admin Keys
+
+```sql
+CREATE TABLE admin_keys (
+  id SERIAL PRIMARY KEY,
+  key VARCHAR(255) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  active BOOLEAN DEFAULT true
+);
+
+-- Insert default admin key
+INSERT INTO admin_keys (key, label) VALUES ('secret-admin-key', 'Default Admin Key');
+```
+
+**Purpose:** Manage secure access for admin APIs or backend dashboards.
+
+- Store API keys or tokens with optional labels and `active` flag.
+
+---
+
+## 🔗 Relationships Summary
+
+| Source Table     | Foreign Key         | Target Table   |
+|------------------|---------------------|----------------|
+| `products`       | `category_id`       | `categories`   |
+| `product_images` | `product_id`        | `products`     |
+
+---
+
+## 🧠 Sample Queries
+
+### Get all products in a category:
+```sql
+SELECT * FROM products
+WHERE category_id = 2;
+```
+
+### Get main image of a product:
+```sql
+SELECT image_path FROM product_images
+WHERE product_id = 5 AND is_main = true
+LIMIT 1;
+```
+
+### List published blog posts:
+```sql
+SELECT * FROM blog_posts
+WHERE status = 'published'
+ORDER BY date DESC;
+```
+
+---
+
+## 📌 Index Recommendations
+
+```sql
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX idx_blog_posts_status ON blog_posts(status);
+CREATE INDEX idx_orders_status ON orders(status);
+```
+
+---
+
+## 🛠️ Technologies You Can Use With This Schema
+
+- **Backend**: Node.js, Express, NestJS, Django, Laravel
+- **Frontend**: React, Next.js, Vue, Nuxt
+- **ORM (optional)**: Sequelize, Prisma, TypeORM
+- **Admin Panel**: Strapi, Directus, Forest Admin
+- **Database Tooling**: pgAdmin, Supabase Studio, DBeaver
+
+---
+
+## 🧪 Suggestions for Extension
+
+- Add user authentication (`users` table).
+- Add inventory/stock control.
+- Improve order `items` field with a relational `order_items` table.
+- Add multi-language support via translation tables.
+
+---
+
+## 📜 License
+
+This schema is open for personal or commercial use. Attribution is appreciated but not required.
+
+---
+
+## 🤝 Contributions
+
+Feel free to contribute improvements, suggest optimizations, or ask questions!
+
